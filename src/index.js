@@ -23,6 +23,12 @@ app.use(cors({
 app.use(express.json());
 app.use(bodyParser.json());
 
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
+
 app.use('/api/users', userRouter);
 
 
