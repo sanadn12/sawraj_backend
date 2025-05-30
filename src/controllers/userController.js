@@ -4,6 +4,12 @@ import  jwt from "jsonwebtoken";
 import { generateAndSendOTP } from "../services/otpGenerator.js";
 import { sendWelcomeEmail } from "../services/registered.js";
 import { generateAndStoreOTP,otpStore, getOtpStore,saveOtpStoreToFile ,loadOtpStoreFromFile} from "../services/otpStore.js";
+import { google } from 'googleapis';
+import multer from 'multer';
+import path from 'path';
+import { Readable } from 'stream';
+
+
 
 
 
@@ -189,3 +195,95 @@ export const editUser = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
+
+
+
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// Google Drive auth
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    type: process.env.GOOGLE_TYPE,
+    project_id: process.env.GOOGLE_PROJECT_ID,
+    private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    auth_uri: process.env.GOOGLE_AUTH_URI,
+    token_uri: process.env.GOOGLE_TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.GOOGLE_AUTH_PROVIDER_X509_CERT_URL,
+    client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL,
+    universe_domain: process.env.GOOGLE_UNIVERSE_DOMAIN,
+  },
+  scopes: ['https://www.googleapis.com/auth/drive'],
+});
+
+const drive = google.drive({ version: 'v3', auth });
+
+export const editProfilePic = async (req, res) => {
+  const { id } = req.params;
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  try {
+    const existingUser = await user.findById(id);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prepare metadata for Google Drive upload
+    const fileMetadata = {
+      name: req.file.originalname,
+      parents: ['1mQF1TYqTj2I2Kg8d3__hhl-juxbOdHmH'], //  folder 
+    };
+
+    // Prepare media stream for Google Drive upload
+    const media = {
+      mimeType: req.file.mimetype,
+      body: Readable.from(req.file.buffer),  // Convert buffer to stream
+    };
+
+    // Upload the file to Google Drive
+    const uploadResponse = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id',
+    });
+
+    const newFileId = uploadResponse.data.id;
+    const newDirectLink = `https://drive.google.com/uc?export=view&id=${newFileId}`;
+
+    // Delete old file from Google Drive if exists
+    if (existingUser.profilePicture) {
+      const oldFileIdMatch = existingUser.profilePicture.match(/id=(.*)/);
+      if (oldFileIdMatch && oldFileIdMatch[1]) {
+        await drive.files.delete({ fileId: oldFileIdMatch[1] });
+      }
+    }
+
+    // Update user profile picture URL in DB
+    existingUser.profilePicture = newDirectLink;
+    const updatedUser = await existingUser.save();
+
+    res.status(200).json({
+      message: 'Profile picture updated successfully!',
+     _id: updatedUser._id,
+    profilePicture: updatedUser.profilePicture,
+    });
+  } catch (error) {
+    console.error('Error updating profile picture:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+// Export route
+export const editProfilePicRoute = [upload.single('profilePicture'), editProfilePic];
+

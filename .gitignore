@@ -1,6 +1,10 @@
 # Node modules
 node_modules/
 
+
+#keys for google
+server/
+
 # Logs
 logs
 *.log
