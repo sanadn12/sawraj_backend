@@ -4,9 +4,7 @@ import  jwt from "jsonwebtoken";
 import { generateAndSendOTP } from "../services/otpGenerator.js";
 import { sendWelcomeEmail } from "../services/registered.js";
 import { generateAndStoreOTP,otpStore, getOtpStore,saveOtpStoreToFile ,loadOtpStoreFromFile} from "../services/otpStore.js";
-import { google } from 'googleapis';
-import multer from 'multer';
-import path from 'path';
+
 import { Readable } from 'stream';
 
 
@@ -135,16 +133,12 @@ export const login = async (req, res) => {
 
     // Generate token
     const token = jwt.sign(
-      { id: User.id, email: User.email },
+      { id: User.id, email: User.email, role: User.role },
       process.env.JWT_SECRET,
       { expiresIn: '2d' }
     );
 
-    res.status(200).json({ message: 'Login successful', token, user: { 
-    _id: User._id, 
-    email: User.email, 
-    name: User.name 
-  }  });
+    res.status(200).json({ message: 'Login successful', token  });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -153,10 +147,14 @@ export const login = async (req, res) => {
   
 
 export const getUser = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const foundUser = await user.findById(id).select("-password");
+    const userId = req.user?.id;  
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID not found in token" });
+    }
+
+    const foundUser = await user.findById(userId).select("-password");
 
     if (!foundUser) {
       return res.status(404).json({ message: "User not found" });
@@ -171,8 +169,11 @@ export const getUser = async (req, res) => {
 
 
 export const editUser = async (req, res) => {
-  const { id } = req.params;  // user ID from URL
-  const { name, address } = req.body;  // data to update
+const userId = req.user?.id;
+if (!userId) {
+      return res.status(401).json({ error: "Unauthorized: No user ID found" });
+    }
+  const { name, address } = req.body;  
 
   if (!name || !address) {
     return res.status(400).json({ error: 'Name and address are required' });
@@ -180,7 +181,7 @@ export const editUser = async (req, res) => {
 
   try {
     const updatedUser = await user.findByIdAndUpdate(
-      id,
+      userId,
       { name, address },
       { new: true, runValidators: true }
     );
@@ -202,88 +203,56 @@ export const editUser = async (req, res) => {
 
 
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-// Google Drive auth
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    type: process.env.GOOGLE_TYPE,
-    project_id: process.env.GOOGLE_PROJECT_ID,
-    private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    auth_uri: process.env.GOOGLE_AUTH_URI,
-    token_uri: process.env.GOOGLE_TOKEN_URI,
-    auth_provider_x509_cert_url: process.env.GOOGLE_AUTH_PROVIDER_X509_CERT_URL,
-    client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL,
-    universe_domain: process.env.GOOGLE_UNIVERSE_DOMAIN,
-  },
-  scopes: ['https://www.googleapis.com/auth/drive'],
-});
-
-const drive = google.drive({ version: 'v3', auth });
-
 export const editProfilePic = async (req, res) => {
-  const { id } = req.params;
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized: No user ID found" });
+  }
 
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+  const { profilePicture } = req.body;
+  if (!profilePicture) {
+    return res.status(400).json({ error: "No profile picture provided" });
   }
 
   try {
-    const existingUser = await user.findById(id);
+    const existingUser = await user.findById(userId);
     if (!existingUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Prepare metadata for Google Drive upload
-    const fileMetadata = {
-      name: req.file.originalname,
-      parents: ['1mQF1TYqTj2I2Kg8d3__hhl-juxbOdHmH'], //  folder 
-    };
-
-    // Prepare media stream for Google Drive upload
-    const media = {
-      mimeType: req.file.mimetype,
-      body: Readable.from(req.file.buffer),  // Convert buffer to stream
-    };
-
-    // Upload the file to Google Drive
-    const uploadResponse = await drive.files.create({
-      resource: fileMetadata,
-      media: media,
-      fields: 'id',
-    });
-
-    const newFileId = uploadResponse.data.id;
-    const newDirectLink = `https://drive.google.com/uc?export=view&id=${newFileId}`;
-
-    // Delete old file from Google Drive if exists
-    if (existingUser.profilePicture) {
-      const oldFileIdMatch = existingUser.profilePicture.match(/id=(.*)/);
-      if (oldFileIdMatch && oldFileIdMatch[1]) {
-        await drive.files.delete({ fileId: oldFileIdMatch[1] });
-      }
-    }
-
-    // Update user profile picture URL in DB
-    existingUser.profilePicture = newDirectLink;
+    existingUser.profilePicture = profilePicture; 
     const updatedUser = await existingUser.save();
 
     res.status(200).json({
-      message: 'Profile picture updated successfully!',
-     _id: updatedUser._id,
-    profilePicture: updatedUser.profilePicture,
+      message: "Profile picture updated successfully!",
+      _id: updatedUser._id,
+      profilePicture: updatedUser.profilePicture,
     });
   } catch (error) {
-    console.error('Error updating profile picture:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error updating profile picture:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
 
-// Export route
-export const editProfilePicRoute = [upload.single('profilePicture'), editProfilePic];
 
+export const getAllUsers = async (req, res) => {
+  try {
+     if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden: You do not have permission to access this resource." });
+    }
+
+    // Get only users with role = "user"
+    const users = await user.find({ role: "user" }).select("-password");
+    const userCount = await user.countDocuments({ role: "user" });
+
+    res.status(200).json({
+      success: true,
+      count: userCount,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};

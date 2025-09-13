@@ -10,7 +10,7 @@ router.get('/getalllistings',getalllistings);
 
 router.get('/getlisting/:id',getlisting);
 
-router.get('/getmylisting/:id',authenticateJWT,getMyListing);
+router.get('/getmylisting',authenticateJWT,getMyListing);
 
 
 router.put('/edit/:id',authenticateJWT,editlisting);

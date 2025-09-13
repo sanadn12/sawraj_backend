@@ -8,6 +8,11 @@ const userModel = new mongoose.Schema({
     profilePicture : String,
     phone: String,
     verified: { type: Boolean, default: false }, 
+     role: {
+      type: String,
+      enum: ["user", "admin"], 
+      default: "user",      
+    },
  }, { timestamps: true ,
 
 
