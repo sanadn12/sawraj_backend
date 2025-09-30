@@ -43,6 +43,19 @@ app.use(cors({
 
 
 app.use(express.json({ limit: "10mb" }));
+app.get('/test-email', async (req, res) => {
+  try {
+    await sendMail(
+      "ni.sanad1433@gmail.com", // replace with an email you can access
+      "Test Email from Sawraj Backend",
+      "<h1>Hello!</h1><p>If you see this, SMTP works on Render.</p>"
+    );
+    res.status(200).json({ message: "Email send attempt completed" });
+  } catch (err) {
+    console.error("Test email failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(helmet());
 

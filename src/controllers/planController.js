@@ -189,7 +189,6 @@ export const buyPlan = async (req, res) => {
       }
     };
 
-    console.log('Creating Cashfree order:', { orderId, amount: selectedPlan.price });
 
     const response = await axios.post(
       `${CASHFREE_CONFIG.baseUrl}/orders`,
@@ -456,7 +455,7 @@ export const cashfreeWebhook = async (req, res) => {
 
         <p style="font-size: 16px; margin-bottom: 15px;">
           Your subscription is now <b style="color:#16a34a;">active</b> and valid till  
-          <b>${userObj.subscriptionValidTill.toDateString()}</b>.
+          <b>${subscriptionValidTill.toDateString()}</b>.
         </p>
 
         <!-- Call-to-Action -->
