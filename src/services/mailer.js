@@ -3,21 +3,24 @@ import nodemailer from "nodemailer";
 export const sendMail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail", 
+      host: "smtp-relay.brevo.com", 
+      port: 587,                    
+      secure: false,              
       auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS, 
+        user: "984483001@smtp-brevo.com",  // Your SMTP login
+        pass: process.env.SENDINBLUE_SMTP_PASS, 
       },
     });
 
     await transporter.sendMail({
-      from: `"Sawraj Enterprises" <${process.env.EMAIL_USER}>`,
+      from: `"Sawraj Enterprises" <sawrajenterprises2003@gmail.com>`, // Verified sender
       to,
       subject,
       html,
     });
 
+    console.log("Email sent successfully via Sendinblue!");
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Error sending email via Sendinblue:", error);
   }
 };
