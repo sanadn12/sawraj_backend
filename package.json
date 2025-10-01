@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "axios": "^1.12.2",
     "bcrypt": "^5.1.1",
     "cashfree-pg": "^5.0.8",
